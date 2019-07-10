@@ -1,11 +1,9 @@
 import torchvision.models as models
 
-import pandas as pd
 import scipy.stats
 from scipy.stats import norm
 
 import numpy as np
-
 
 import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
@@ -20,6 +18,7 @@ def extract_torch_weights(model):
 	return weights
 
 def find_best_fit(X, Y):
+	'''Directly computes linear best fit to points.'''
 	x_avg = sum(X)/len(X)
 	y_avg = sum(Y)/len(Y)
 	numer = sum([x * y for x,y in zip(X,Y)]) - len(X) * x_avg * y_avg
@@ -27,6 +26,7 @@ def find_best_fit(X, Y):
 	b = numer/denom
 	a = y_avg - b * x_avg
 	return a,b
+
 alexnet = models.alexnet(pretrained = True)
 vgg = models.vgg16(pretrained = True)
 googlenet = models.googlenet(pretrained = True)
