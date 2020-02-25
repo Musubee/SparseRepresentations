@@ -34,6 +34,19 @@ epochs = 5
 batch_size = 1
 learning_rate = 0.00005
 
+# Used for graphing class data 
+color_dict = {0:'xkcd:black',
+			1: 'xkcd:aqua',
+			2: 'xkcd:blue',
+			3: 'xkcd:brown',
+			4: 'xkcd:coral',
+			5: 'xkcd:gold',
+			6: 'xkcd:green',
+			7: 'xkcd:lavender',
+			8: 'xkcd:orange',
+			9: 'xkcd:pink'
+			}
+
 class Identity(nn.Module):
 	#https://discuss.pytorch.org/t/how-to-delete-layer-in-pretrained-model/17648/2
 	def __init__(self, x=0, dim=0):
@@ -306,18 +319,8 @@ def inter_kl_div_actual_vs_theoretical(samples, weights, fits):
 											theoretical_distributions[label][1],
 											fits[other_label][0], fits[other_label][1])))
 
-def plot_mu_sigma(samples, weights, fits):
-	color_dict = {0:'xkcd:black',
-				1: 'xkcd:aqua',
-				2: 'xkcd:blue',
-				3: 'xkcd:brown',
-				4: 'xkcd:coral',
-				5: 'xkcd:gold',
-				6: 'xkcd:green',
-				7: 'xkcd:lavender',
-				8: 'xkcd:orange',
-				9: 'xkcd:pink'
-				}
+def plot_mu_sigma_actual_interclass(samples, weights, fits):
+
 
 	m_weights, s_weights = norm.fit(weights)
 	# Actual output plotting
@@ -335,10 +338,12 @@ def plot_mu_sigma(samples, weights, fits):
 	plt.legend(handles = handles)
 	plt.show()
 
+def plot_mu_sigma_theoretical_actual(samples, weights, fits):
 
 	# Theoretical vs Averaged Actual
 	plt.clf()
 	fits = average_fits(fits)
+	m_weights, s_weights = norm.fit(weights)
 
 	for sample_class in samples:
 		label = sample_class[0][1]
@@ -354,17 +359,72 @@ def plot_mu_sigma(samples, weights, fits):
 	plt.legend(handles = handles)
 	plt.show()
 
+def plot_mu_sigma_class(samples, weights, fits):
+	m_weights, s_weights = norm.fit(weights)
+	for sample_class in samples:
+		plt.clf()
+		label = sample_class[0][1]
+		color = color_dict[label]
+		xs = [point[0] for point in fits[label]]
+		ys = [point[1] for point in fits[label]]
+		plt.scatter(xs, ys, c = color)
+		plt.title('Mu, Sigma scatter for class {}'.format(label))
+		plt.show()
+	
+
+
+def threshold_data(train, test):
+	thresholded_train = []
+	thresholded_test = []
+	for sample in train:
+		tensor = sample[0]
+		threshold = 0.5
+		tensor = (tensor >= threshold).float() * 1
+		thresholded_train.append((tensor, sample[1]))
+	for sample in test:
+		tensor = sample[0]
+		threshold = 0.5
+		tensor = (tensor >= threshold).float() * 1
+		thresholded_test.append((tensor, sample[1]))
+	return thresholded_train, thresholded_test
+
+def interclass_cluster_distance(samples, fits):
+	for i in range(10):
+		for j in range(10):
+			distance = math.sqrt((fits[i][0] - fits[j][0])**2 + 
+									(fits[i][1] - fits[j][1])**2)
+			print('Distance between {} and {}: {}'.format(i, j, distance))
+
+def intraclass_cluster_distance(samples, fits):
+
+	intra_cluster_distances = []
+	for sample_class in samples:
+		label = sample_class[0][1]
+		intra_distance_sum = 0
+		for sample in sample_class:
+			intra_distance_sum += math.sqrt((fits[label][0] - norm.fit(sample[0])[0])**2 + (fits[label][1] - norm.fit(sample[0])[1])**2)
+		intra_cluster_distances.append((intra_distance_sum/len(sample_class), label))
+	return intra_cluster_distances
 
 
 # Experiments
 mnist_train_data, mnist_test_data = get_mnist_data()
 
+mnist_train_data, mnist_test_data = threshold_data(mnist_train_data, mnist_test_data)
+
+
 net = Simple_MNIST_Model()
 
-net.load_state_dict(torch.load('trained_mnist.pt'))
-net.eval()
+# No thresholding model
+# net.load_state_dict(torch.load('trained_mnist_no_thresholding.pt'))
+# net.eval()
 
-samples = get_correct_samples(net, mnist_test_data, 3)
+# Thresholded model
+net.load_state_dict(torch.load('trained_mnist_thresholding.pt'))
+
+
+
+samples = get_correct_samples(net, mnist_test_data, 50)
 
 weights = get_model_weights(net)
 
@@ -374,6 +434,13 @@ net_outs = sample_test_outputs(net, samples)
 
 fits = get_fits(net_outs)
 
-plot_mu_sigma(samples, weights, fits)
+fits = average_fits(fits)
+
+#interclass_cluster_distance(samples, fits)
+print(intraclass_cluster_distance(samples, fits))
+
+#plot_mu_sigma_class(samples, weights, fits)
+
+# plot_mu_sigma(samples, weights, fits)
 
 
